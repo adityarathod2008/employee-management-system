@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Management System</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- React 18, ReactDOM, and Babel Standalone via Fast Reliable CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+</head>
+<body>
+  <!-- Root React Mount Node -->
+  <div id="root">
+    <div style="display:flex; justify-content:center; align-items:center; min-height:100vh; font-family:'Inter',sans-serif; color:#64748b; font-size:1.1rem; gap:0.5rem;">
+      <i class="fa-solid fa-spinner fa-spin" style="color:#4f46e5;"></i>
+      <span>Loading Employee Management System...</span>
+    </div>
+  </div>
+
+  <!-- Inline React Component (Inlined to allow direct double-click on file:// without browser CORS restrictions) -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Initial sample employees data
+    const INITIAL_EMPLOYEES = [
+      {
+        id: "EMP-101",
+        name: "Aarav Sharma",
+        email: "aarav.sharma@company.com",
+        phone: "+91 98765 43210",
+        role: "Senior Frontend Engineer",
+        department: "Engineering",
+        salary: 85000,
+        status: "Active",
+        joinDate: "2023-03-15"
+      },
+      {
+        id: "EMP-102",
+        name: "Priya Patel",
+        email: "priya.patel@company.com",
+        phone: "+91 98123 45678",
+        role: "Product Designer",
+        department: "Design",
+        salary: 72000,
+        status: "Active",
+        joinDate: "2023-06-20"
+      },
+      {
+        id: "EMP-103",
+        name: "Rohan Verma",
+        email: "rohan.verma@company.com",
+        phone: "+91 98234 56789",
+        role: "HR Operations Lead",
+        department: "Human Resources",
+        salary: 62000,
+        status: "On Leave",
+        joinDate: "2022-11-10"
+      },
+      {
+        id: "EMP-104",
+        name: "Sneha Rao",
+        email: "sneha.rao@company.com",
+        phone: "+91 98345 67890",
+        role: "Financial Analyst",
+        department: "Finance",
+        salary: 68000,
+        status: "Active",
+        joinDate: "2024-01-08"
+      },
+      {
+        id: "EMP-105",
+        name: "Vikram Malhotra",
+        email: "vikram.m@company.com",
+        phone: "+91 98456 78901",
+        role: "Marketing Manager",
+        department: "Marketing",
+        salary: 75000,
+        status: "Inactive",
+        joinDate: "2022-04-12"
+      }
+    ];
+
+    const DEPARTMENTS = [
+      "All",
+      "Engineering",
+      "Design",
+      "Human Resources",
+      "Finance",
+      "Marketing",
+      "Sales"
+    ];
+
+    function App() {
+      // Persistence with LocalStorage
+      const [employees, setEmployees] = useState(() => {
+        try {
+          const saved = localStorage.getItem("ems_employees");
+          return saved ? JSON.parse(saved) : INITIAL_EMPLOYEES;
+        } catch (e) {
+          return INITIAL_EMPLOYEES;
+        }
+      });
+
+      // Filters & Search
+      const [searchTerm, setSearchTerm] = useState("");
+      const [selectedDept, setSelectedDept] = useState("All");
+      const [selectedStatus, setSelectedStatus] = useState("All");
+      const [viewMode, setViewMode] = useState("table"); // 'table' or 'grid'
+
+      // Modal States
+      const [isModalOpen, setIsModalOpen] = useState(false);
+      const [modalMode, setModalMode] = useState("add"); // 'add' or 'edit'
+      const [currentEmployee, setCurrentEmployee] = useState(null);
+      const [viewDetailsEmp, setViewDetailsEmp] = useState(null);
+
+      // Form State
+      const [formData, setFormData] = useState({
+        id: "",
+        name: "",
+        email: "",
+        phone: "",
+        role: "",
+        department: "Engineering",
+        salary: "",
+        status: "Active",
+        joinDate: new Date().toISOString().split("T")[0]
+      });
+
+      // Toast Notification
+      const [toast, setToast] = useState(null);
+
+      const showToast = (message, type = "info") => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+      };
+
+      // Sync with LocalStorage
+      useEffect(() => {
+        try {
+          localStorage.setItem("ems_employees", JSON.stringify(employees));
+        } catch (e) {
+          console.error("Failed to save to local storage", e);
+        }
+      }, [employees]);
+
+      // Statistics Calculation
+      const stats = useMemo(() => {
+        const total = employees.length;
+        const active = employees.filter(e => e.status === "Active").length;
+        const uniqueDepts = new Set(employees.map(e => e.department)).size;
+        const totalPayroll = employees.reduce((sum, e) => sum + (Number(e.salary) || 0), 0);
+        const avgSalary = total > 0 ? Math.round(totalPayroll / total) : 0;
+
+        return { total, active, uniqueDepts, avgSalary };
+      }, [employees]);
+
+      // Filtered Employees
+      const filteredEmployees = useMemo(() => {
+        return employees.filter(emp => {
+          const matchSearch =
+            emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            emp.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            emp.id.toLowerCase().includes(searchTerm.toLowerCase());
+
+          const matchDept = selectedDept === "All" || emp.department === selectedDept;
+          const matchStatus = selectedStatus === "All" || emp.status === selectedStatus;
+
+          return matchSearch && matchDept && matchStatus;
+        });
+      }, [employees, searchTerm, selectedDept, selectedStatus]);
+
+      // Handlers
+      const handleOpenAdd = () => {
+        const nextIdNum = employees.length > 0
+          ? Math.max(...employees.map(e => parseInt(e.id.replace("EMP-", "")) || 100)) + 1
+          : 101;
+        
+        setFormData({
+          id: `EMP-${nextIdNum}`,
+          name: "",
+          email: "",
+          phone: "",
+          role: "",
+          department: "Engineering",
+          salary: "",
+          status: "Active",
+          joinDate: new Date().toISOString().split("T")[0]
+        });
+        setModalMode("add");
+        setIsModalOpen(true);
+      };
+
+      const handleOpenEdit = (emp) => {
+        setCurrentEmployee(emp);
+        setFormData({ ...emp });
+        setModalMode("edit");
+        setIsModalOpen(true);
+      };
+
+      const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setCurrentEmployee(null);
+      };
+
+      const handleFormChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+      };
+
+      const handleFormSubmit = (e) => {
+        e.preventDefault();
+        if (!formData.name.trim() || !formData.email.trim() || !formData.role.trim()) {
+          showToast("Please fill in all required fields", "warning");
+          return;
+        }
+
+        if (modalMode === "add") {
+          setEmployees(prev => [formData, ...prev]);
+          showToast(`Employee ${formData.name} added successfully!`, "success");
+        } else {
+          setEmployees(prev => prev.map(emp => emp.id === formData.id ? formData : emp));
+          showToast(`Employee ${formData.name} updated!`, "success");
+        }
+
+        handleCloseModal();
+      };
+
+      const handleDelete = (id, name) => {
+        if (window.confirm(`Are you sure you want to remove ${name} (${id}) from the system?`)) {
+          setEmployees(prev => prev.filter(emp => emp.id !== id));
+          showToast(`Removed employee ${name}`, "info");
+        }
+      };
+
+      // CSV Export feature
+      const exportToCSV = () => {
+        if (employees.length === 0) {
+          showToast("No employee records to export", "warning");
+          return;
+        }
+        const headers = ["ID", "Name", "Email", "Phone", "Role", "Department", "Salary (INR)", "Status", "Join Date"];
+        const rows = employees.map(e => [
+          e.id,
+          `"${e.name}"`,
+          e.email,
+          e.phone,
+          `"${e.role}"`,
+          e.department,
+          e.salary,
+          e.status,
+          e.joinDate
+        ]);
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `employees_export_${new Date().toISOString().split("T")[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("Employee roster exported as CSV", "success");
+      };
+
+      return (
+        <div>
+          {/* Top Navbar */}
+          <header className="navbar">
+            <div className="nav-brand">
+              <i className="fa-solid fa-users-gear"></i>
+              <div>
+                <span>WorkSphere</span>
+                <div className="nav-tagline">Employee Management System</div>
+              </div>
+            </div>
+            <div className="nav-actions">
+              <div className="nav-user">
+                <i className="fa-solid fa-circle-user"></i>
+                <span>HR Admin Portal</span>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content Container */}
+          <main className="container">
+            {/* Metric Summary Cards */}
+            <section className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-info">
+                  <h3>Total Workforce</h3>
+                  <p>{stats.total}</p>
+                </div>
+                <div className="stat-icon icon-blue">
+                  <i className="fa-solid fa-users"></i>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-info">
+                  <h3>Active Members</h3>
+                  <p>{stats.active}</p>
+                </div>
+                <div className="stat-icon icon-green">
+                  <i className="fa-solid fa-user-check"></i>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-info">
+                  <h3>Departments</h3>
+                  <p>{stats.uniqueDepts}</p>
+                </div>
+                <div className="stat-icon icon-cyan">
+                  <i className="fa-solid fa-building"></i>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-info">
+                  <h3>Avg. Monthly Salary</h3>
+                  <p>₹{stats.avgSalary.toLocaleString("en-IN")}</p>
+                </div>
+                <div className="stat-icon icon-yellow">
+                  <i className="fa-solid fa-wallet"></i>
+                </div>
+              </div>
+            </section>
+
+            {/* Controls Bar: Search, Filters & Action Buttons */}
+            <section className="controls-card">
+              <div className="filters-group">
+                {/* Search Box */}
+                <div className="search-box">
+                  <i className="fa-solid fa-magnifying-glass"></i>
+                  <input
+                    type="text"
+                    placeholder="Search by name, role, email or ID..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                {/* Department Filter */}
+                <select
+                  className="select-filter"
+                  value={selectedDept}
+                  onChange={e => setSelectedDept(e.target.value)}
+                >
+                  {DEPARTMENTS.map(dept => (
+                    <option key={dept} value={dept}>
+                      {dept === "All" ? "All Departments" : dept}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Status Filter */}
+                <select
+                  className="select-filter"
+                  value={selectedStatus}
+                  onChange={e => setSelectedStatus(e.target.value)}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="On Leave">On Leave</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="btn-group">
+                <button
+                  className={`btn-icon ${viewMode === "table" ? "active" : ""}`}
+                  onClick={() => setViewMode("table")}
+                  title="Table View"
+                >
+                  <i className="fa-solid fa-table-list"></i>
+                </button>
+                <button
+                  className={`btn-icon ${viewMode === "grid" ? "active" : ""}`}
+                  onClick={() => setViewMode("grid")}
+                  title="Grid View"
+                >
+                  <i className="fa-solid fa-grip"></i>
+                </button>
+
+                <button className="btn btn-secondary" onClick={exportToCSV} title="Export data to CSV">
+                  <i className="fa-solid fa-file-arrow-down"></i>
+                  <span>Export</span>
+                </button>
+
+                <button className="btn btn-primary" onClick={handleOpenAdd}>
+                  <i className="fa-solid fa-user-plus"></i>
+                  <span>Add Employee</span>
+                </button>
+              </div>
+            </section>
+
+            {/* Employee Directory Display */}
+            {filteredEmployees.length === 0 ? (
+              <div className="empty-state">
+                <i className="fa-solid fa-address-book"></i>
+                <h3>No employees found</h3>
+                <p>Try modifying your search keywords or clear your active filters.</p>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedDept("All");
+                    setSelectedStatus("All");
+                  }}
+                >
+                  Clear Filters
+                </button>
+              </div>
+            ) : viewMode === "table" ? (
+              /* Table View */
+              <div className="table-container">
+                <div className="table-responsive">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Employee</th>
+                        <th>ID</th>
+                        <th>Department</th>
+                        <th>Role</th>
+                        <th>Salary</th>
+                        <th>Status</th>
+                        <th style={{ textAlign: "right" }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEmployees.map(emp => {
+                        const initials = emp.name
+                          .split(" ")
+                          .map(n => n[0])
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase();
+
+                        return (
+                          <tr key={emp.id}>
+                            <td>
+                              <div className="emp-name-cell">
+                                <div className="avatar">{initials}</div>
+                                <div className="emp-info">
+                                  <div className="name">{emp.name}</div>
+                                  <div className="email">{emp.email}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--text-muted)" }}>
+                                {emp.id}
+                              </span>
+                            </td>
+                            <td>
+                              <span className="badge badge-dept">{emp.department}</span>
+                            </td>
+                            <td>{emp.role}</td>
+                            <td style={{ fontWeight: 600 }}>
+                              ₹{Number(emp.salary).toLocaleString("en-IN")}
+                            </td>
+                            <td>
+                              <span
+                                className={`badge badge-${emp.status.toLowerCase().replace(" ", "")}`}
+                              >
+                                {emp.status}
+                              </span>
+                            </td>
+                            <td>
+                              <div className="actions-cell" style={{ justifyContent: "flex-end" }}>
+                                <button
+                                  className="action-btn view"
+                                  title="View Profile"
+                                  onClick={() => setViewDetailsEmp(emp)}
+                                >
+                                  <i className="fa-regular fa-eye"></i>
+                                </button>
+                                <button
+                                  className="action-btn edit"
+                                  title="Edit Record"
+                                  onClick={() => handleOpenEdit(emp)}
+                                >
+                                  <i className="fa-regular fa-pen-to-square"></i>
+                                </button>
+                                <button
+                                  className="action-btn delete"
+                                  title="Delete Record"
+                                  onClick={() => handleDelete(emp.id, emp.name)}
+                                >
+                                  <i className="fa-regular fa-trash-can"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              /* Card / Grid View */
+              <div className="grid-container">
+                {filteredEmployees.map(emp => {
+                  const initials = emp.name
+                    .split(" ")
+                    .map(n => n[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase();
+
+                  return (
+                    <div key={emp.id} className="emp-card">
+                      <div className="emp-card-header">
+                        <div className="avatar">{initials}</div>
+                        <span
+                          className={`badge badge-${emp.status.toLowerCase().replace(" ", "")}`}
+                        >
+                          {emp.status}
+                        </span>
+                      </div>
+
+                      <div className="emp-card-body">
+                        <h4>{emp.name}</h4>
+                        <div className="emp-card-role">{emp.role}</div>
+
+                        <div className="emp-card-details">
+                          <div>
+                            <i className="fa-regular fa-id-badge" style={{ width: "16px" }}></i>
+                            <span>{emp.id} • {emp.department}</span>
+                          </div>
+                          <div>
+                            <i className="fa-regular fa-envelope" style={{ width: "16px" }}></i>
+                            <span style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                              {emp.email}
+                            </span>
+                          </div>
+                          <div>
+                            <i className="fa-solid fa-indian-rupee-sign" style={{ width: "16px" }}></i>
+                            <span>₹{Number(emp.salary).toLocaleString("en-IN")} / month</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="emp-card-footer">
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                          Joined {emp.joinDate}
+                        </span>
+                        <div className="actions-cell">
+                          <button
+                            className="action-btn view"
+                            title="View Profile"
+                            onClick={() => setViewDetailsEmp(emp)}
+                          >
+                            <i className="fa-regular fa-eye"></i>
+                          </button>
+                          <button
+                            className="action-btn edit"
+                            title="Edit Record"
+                            onClick={() => handleOpenEdit(emp)}
+                          >
+                            <i className="fa-regular fa-pen-to-square"></i>
+                          </button>
+                          <button
+                            className="action-btn delete"
+                            title="Delete Record"
+                            onClick={() => handleDelete(emp.id, emp.name)}
+                          >
+                            <i className="fa-regular fa-trash-can"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </main>
+
+          {/* Add / Edit Employee Modal */}
+          {isModalOpen && (
+            <div className="modal-overlay" onClick={handleCloseModal}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>{modalMode === "add" ? "Add New Employee" : `Edit Employee (${formData.id})`}</h3>
+                  <button className="modal-close" onClick={handleCloseModal}>
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <form onSubmit={handleFormSubmit}>
+                  <div className="modal-body">
+                    <div className="form-grid">
+                      <div className="form-group full-width">
+                        <label>Full Name *</label>
+                        <input
+                          type="text"
+                          name="name"
+                          required
+                          placeholder="e.g. Aarav Sharma"
+                          value={formData.name}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Email Address *</label>
+                        <input
+                          type="email"
+                          name="email"
+                          required
+                          placeholder="name@company.com"
+                          value={formData.email}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Contact Phone</label>
+                        <input
+                          type="text"
+                          name="phone"
+                          placeholder="+91 98765 43210"
+                          value={formData.phone}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Job Title / Role *</label>
+                        <input
+                          type="text"
+                          name="role"
+                          required
+                          placeholder="e.g. Frontend Developer"
+                          value={formData.role}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Department</label>
+                        <select
+                          name="department"
+                          value={formData.department}
+                          onChange={handleFormChange}
+                        >
+                          {DEPARTMENTS.filter(d => d !== "All").map(dept => (
+                            <option key={dept} value={dept}>
+                              {dept}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Monthly Salary (₹)</label>
+                        <input
+                          type="number"
+                          name="salary"
+                          min="0"
+                          placeholder="e.g. 75000"
+                          value={formData.salary}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Employment Status</label>
+                        <select
+                          name="status"
+                          value={formData.status}
+                          onChange={handleFormChange}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="On Leave">On Leave</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group full-width">
+                        <label>Date of Joining</label>
+                        <input
+                          type="date"
+                          name="joinDate"
+                          value={formData.joinDate}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={handleCloseModal}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary">
+                      <i className="fa-solid fa-check"></i>
+                      <span>{modalMode === "add" ? "Save Employee" : "Update Changes"}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* View Employee Profile Modal */}
+          {viewDetailsEmp && (
+            <div className="modal-overlay" onClick={() => setViewDetailsEmp(null)}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Employee Profile Card</h3>
+                  <button className="modal-close" onClick={() => setViewDetailsEmp(null)}>
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <div className="modal-body profile-modal-body">
+                  <div className="profile-avatar-large">
+                    {viewDetailsEmp.name
+                      .split(" ")
+                      .map(n => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase()}
+                  </div>
+                  <div className="profile-name">{viewDetailsEmp.name}</div>
+                  <div className="profile-role">{viewDetailsEmp.role}</div>
+
+                  <div className="profile-info-grid">
+                    <div className="profile-info-item">
+                      <label>Employee ID</label>
+                      <p>{viewDetailsEmp.id}</p>
+                    </div>
+                    <div className="profile-info-item">
+                      <label>Department</label>
+                      <p>{viewDetailsEmp.department}</p>
+                    </div>
+                    <div className="profile-info-item">
+                      <label>Email</label>
+                      <p style={{ wordBreak: "break-all" }}>{viewDetailsEmp.email}</p>
+                    </div>
+                    <div className="profile-info-item">
+                      <label>Phone</label>
+                      <p>{viewDetailsEmp.phone || "Not provided"}</p>
+                    </div>
+                    <div className="profile-info-item">
+                      <label>Salary</label>
+                      <p>₹{Number(viewDetailsEmp.salary).toLocaleString("en-IN")}</p>
+                    </div>
+                    <div className="profile-info-item">
+                      <label>Status</label>
+                      <p>
+                        <span
+                          className={`badge badge-${viewDetailsEmp.status.toLowerCase().replace(" ", "")}`}
+                        >
+                          {viewDetailsEmp.status}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="profile-info-item" style={{ gridColumn: "span 2" }}>
+                      <label>Date Joined</label>
+                      <p>{viewDetailsEmp.joinDate}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setViewDetailsEmp(null)}
+                  >
+                    Close
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      const emp = viewDetailsEmp;
+                      setViewDetailsEmp(null);
+                      handleOpenEdit(emp);
+                    }}
+                  >
+                    <i className="fa-regular fa-pen-to-square"></i>
+                    <span>Edit Record</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Floating Toast Notification */}
+          {toast && (
+            <div className="toast">
+              <i
+                className={
+                  toast.type === "success"
+                    ? "fa-solid fa-circle-check"
+                    : toast.type === "warning"
+                    ? "fa-solid fa-triangle-exclamation"
+                    : "fa-solid fa-circle-info"
+                }
+                style={{
+                  color:
+                    toast.type === "success"
+                      ? "var(--success)"
+                      : toast.type === "warning"
+                      ? "var(--warning)"
+                      : "var(--secondary)"
+                }}
+              ></i>
+              <span>{toast.message}</span>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer>
+            <p>Employee Management System • Frontend End-Semester Lab Examination Project</p>
+          </footer>
+        </div>
+      );
+    }
+
+    // Render React App into #root
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
